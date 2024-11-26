@@ -49,42 +49,113 @@ library(ggplot2)
 
 # Although you can call functions from a library using the following notation
 #  without loading the entire library.
-# knitr::opts_chunk$set(echo = TRUE, 
-#                       comment = NA, # Required
-#                       fig.path = "./figures/",  # Store all figures here in relative path (make the folder first)
-#                       fig.align = "center",
-#                       fig.width = 7,
-#                       fig.height = 7,
-#                       message = FALSE, # Turn off load messages
-#                       warning = FALSE # Turn off warnings
-#                       )
+knitr::opts_chunk$set(echo = TRUE, 
+                       comment = NA, # Required
+                       fig.path = "./figures/",  # Store all figures here in relative path (make the folder first)
+                       fig.align = "center",
+                       fig.width = 7,
+                       fig.height = 7,
+                       message = FALSE, # Turn off load messages
+                       warning = FALSE # Turn off warnings
+                       )
 
 ```
 
+Here is a data dictionary containing all features of interest to our project.
+```{r, include=FALSE}
+# Create the data dictionary as a data frame
 
-```{r}
+data_dict <- data.frame(
+
+  Variable = c("landslide_", "trigger", "fatalities", "injuries", "distance", "population", "key_",
+
+               "latitude", "longitude", "year", "month"),
+
+  Type = c("Chr", "Chr", "Int", "Int", "Dbl", "Int", "Chr", "Dbl", "Dbl", "Int", "Int"),
+
+  Description = c("Type of landslide (e.g., Mudslide, Complex, Rock Fall).",
+
+                  "Cause of the landslide (e.g., Downpour, Earthquake, Flooding).",
+
+                  "Number of fatalities.",
+
+                  "Number of injuries.",
+
+                  "How far the landslide traveled.",
+
+                  "Population of the affected area.",
+
+                  "Country abbreviation.",
+
+                  "Latitude coordinates.",
+
+                  "Longitude coordinates.",
+
+                  "Year of occurrence.",
+
+                  "Month of occurrence.")
+
+)
+
+ 
+
+# Display the data dictionary as a table
+
+kable(data_dict, caption = "Data Dictionary for Landslide Dataset")
+
+```
+
+```{r, include=FALSE}
 # Load dataset
 landslide_data <- read.csv("landslide_data.csv")
 
-# Inspect the dataset
-head(landslide_data)
-
 ```
-This first model is a attempt at predicting the possibility of a landslide occurring at a specific coordinate within a 100 mile radius. This is a regression and will output a probability for every input. 
+This first model is a attempt at predicting the possibility of a landslide occurring at a specific specific region of a 100 mile radius. 
 
-First I will conduct a model supposing that all linear regression assumptions hold.
 
 # Data Cleaning
 
 Step 1, get the columns we want. Not the redundant columns that contain the same information or identification numbers, or columns that we don't know what it means.
-```{r}
+```{r, echo = FALSE}
 landslide_data <- landslide_data[, c("landslide_", "trigger", "fatalities", "injuries", "landslide1", "distance", "population", "key_", "latitude", "longitude", "date_")]
 
-head(landslide_data)
-``` 
-```{r}
+ 
 
-```
+head(landslide_data)
+
+ 
+
+# Looking at unique elements for each column
+
+#sapply(landslide_data, unique)
+
+ 
+
+# Remove underscores and convert to lowercase
+
+landslide_data$landslide_ <- tolower(gsub("_", "", landslide_data$landslide_))
+
+landslide_data$trigger <- tolower(gsub("_", "", landslide_data$trigger))
+
+landslide_data$landslide1 <- tolower(gsub("_", "", landslide_data$landslide1))
+
+ 
+
+# Merge snowfall and snowfallsnowmelt elements in trigger column
+
+landslide_data$trigger <- gsub("snowfallsnowmelt", "snowfall", landslide_data$trigger)
+
+ 
+
+# Make sure changes worked
+
+#sapply(landslide_data[, c("landslide_", "trigger", "landslide1")], unique)
+
+
+``` 
+
+The month and the year are under the column "date_", we'll need to extract this into respective columns to properly use them as features in our model.
+
 
 Extracting the month and the year
 ```{r}
@@ -104,20 +175,19 @@ landslide_data$month <- as.integer(landslide_data$month)
 head(landslide_data)
 
 ```
+
+Now we can remove the date column
 ```{r}
 landslide_data <- subset(landslide_data, select = -date_)
-head(landslide_data)
 ```
 
 Now we'll remove all the rows containing NA:
 
 ```{r}
-print(unique(landslide_data$landslide_))
-```
-
-```{r}
 landslide_data <- na.omit(landslide_data)
 ```
+
+Let's visualize the triggers, are there any dominant triggers that can be identified.
 
 ```{r}
 # Load necessary libraries
@@ -142,13 +212,13 @@ kable_table <- kable(trigger_df, caption = "Frequencies of Different Triggers") 
 png("trigger_table.png", width = 800, height = 600)  # Set PNG file size
 grid.table(trigger_df)  # Plot the table
 dev.off()  # Close the plotting device and save the PNG
+
+kable_table
 ```
 
 ```{r}
-print(nrow(landslide_data))
-# Print the number of occurrences for each month
+# Calculate the number of occurrences for each month
 month_count <- table(landslide_data$month)
-print(month_count)
 
 ```
 Now to turn all the columns into numerical values to be able to be used in our model:
@@ -332,7 +402,7 @@ predicted_regions_test <- predict(model_rf_region, newdata = landslide_test)
 accuracy <- sum(predicted_regions_test == landslide_test$region) / length(predicted_regions_test)
 cat("Accuracy: ", accuracy, "\n")
 ```
-This is our baseline model with accuracy of 54.8%
+This is our baseline model with accuracy of 59.2%
 
 Not bad especially considering there are 86 regions but we can do better. 
 
@@ -469,4 +539,5 @@ cat("\nTest Accuracy: ", round(accuracy, 2), "%\n")
 ```
 
 Even with a basic XGBoost without hyperparameter tuning we are able to get better performance than a optimized random forest. 
-However, it is still overfitting to the data so we'll try 
+However, it is still overfitting to the data.
+Next technique I would like to try is bootstrapping. 
